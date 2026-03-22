@@ -2,30 +2,38 @@ import prisma from "../lib/prisma.js";
 
 /**
  * Write an audit log entry.
- * @param {import("express").Request} req
- * @param {string} action
- * @param {string} entityType
- * @param {string} entityId
- * @param {object|null} before
- * @param {object|null} after
- * @param {string} [reason]
+ * Accepts two calling conventions:
+ *   1. auditLog({ userId, action, entityType, entityId, before, after, reason })
+ *   2. logAudit(req, action, entityType, entityId, before, after, reason)  [legacy]
  */
-export async function logAudit(req, action, entityType, entityId, before = null, after = null, reason = null) {
+export async function auditLog({ userId, action, entityType, entityId, before = null, after = null, reason = null } = {}) {
     try {
         await prisma.auditLog.create({
             data: {
-                userId: req.user?.id ?? null,
+                userId: userId ?? null,
                 action,
                 entityType,
                 entityId,
-                before: before ? before : undefined,
-                after: after ? after : undefined,
-                reason,
-                ip: req.ip,
+                before: before ? JSON.stringify(before) : null,
+                after: after ? JSON.stringify(after) : null,
+                reason: reason ?? null,
+                ip: null,
             },
         });
     } catch (e) {
-        // Never block the main request due to audit failures
         console.error("Audit log failed:", e.message);
     }
+}
+
+/** Legacy compat alias — some routes call logAudit(req, action, …) */
+export async function logAudit(req, action, entityType, entityId, before = null, after = null, reason = null) {
+    return auditLog({
+        userId: req?.user?.id ?? null,
+        action,
+        entityType,
+        entityId,
+        before,
+        after,
+        reason,
+    });
 }

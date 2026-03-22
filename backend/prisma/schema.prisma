@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -121,7 +121,7 @@ model RecurringScheduleTemplate {
   employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   name         String   @default("Default")
   // JSON array of { dayOfWeek: 0-6, startTime: "HH:MM", endTime: "HH:MM", isNbot: bool }
-  pattern      Json
+  pattern      String  // JSON serialized array of { dayOfWeek, startTime, endTime, isNbot }
   effectiveFrom DateTime @default(now())
   effectiveTo   DateTime?
   active        Boolean  @default(true)
@@ -267,7 +267,7 @@ model NbotEntry {
 model ScheduleVersion {
   id          String   @id @default(cuid())
   weekStart   DateTime
-  snapshot    Json     // Full denormalized shift+assignment data for the week
+  snapshot    String   // JSON: Full denormalized shift+assignment data for the week
   createdBy   String?
   changeNote  String?
   createdAt   DateTime @default(now())
@@ -282,8 +282,8 @@ model AuditLog {
   action     String   // e.g. "UPDATE_SHIFT", "ADJUST_PTO", "APPROVE_LEAVE"
   entityType String   // "Employee", "Shift", "LeaveRequest", etc.
   entityId   String
-  before     Json?
-  after      Json?
+  before     String?
+  after      String?
   reason     String?
   ip         String?
   createdAt  DateTime @default(now())
