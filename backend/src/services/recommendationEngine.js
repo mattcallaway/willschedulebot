@@ -19,7 +19,7 @@ export async function recommendCoverage({ date, shiftId, startTime, endTime, dur
 
     // ── Step 1: Get all active employees ─────────────────────────────────────
     const allEmployees = await prisma.employee.findMany({
-        where: { active: true },
+        where: { activeFlag: true },
         include: {
             leaveRequests: {
                 where: {

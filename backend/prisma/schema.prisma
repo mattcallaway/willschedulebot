@@ -26,37 +26,48 @@ model User {
 
 model Employee {
   id          String   @id @default(cuid())
-  // Roster fields
-  name        String
-  nuid        String?  @unique
-  rank        String?
-  phone       String?
-  email       String?
-  kpEmail     String?
-  shift       String?  // e.g. "Day", "Night", "Swing"
-  status      String?  // e.g. "Active", "Inactive", "Leave"
-  hireDate    DateTime?
-  last4       String?  // Last 4 of SSN
-  bciNumber   String?
-  badgeNumber String?
-  bwcIssued   Boolean  @default(false)
-  cedIssued   Boolean  @default(false)
-  notes       String?
 
-  // Operational fields
-  contractedWeeklyHours  Float    @default(40)   // 32 or 40
-  employmentType         String   @default("full-time") // full-time | part-time | contract
-  defaultShiftLength     Float    @default(8)    // hours
-  ptoAccrualRate         Float    @default(3.08) // hrs per 80 hrs worked
-  sickAccrualRate        Float    @default(1.54) // hrs per 80 hrs worked
-  ptoBalance             Float    @default(0)
-  sickBalance            Float    @default(0)
-  overtimeThreshold      Float    @default(40)   // hrs/week before OT
-  nbotEligible           Boolean  @default(true)
-  active                 Boolean  @default(true)
+  // ── Roster fields (matching spreadsheet columns) ──────────────────────
+  name                    String
+  nuid                    String?  @unique
+  rank                    String?
+  phone                   String?
+  email                   String?
+  kpEmail                 String?  // "KP Email" column
+  shiftText               String?  // free-text shift description e.g. "0600-1400 SUN-WED"
+  status                  String?  // "Active" | "Inactive" | "Leave"
+  hireDate                DateTime?
+  last4                   String?  // Last 4 of SSN
+  bciNumber               String?
+  licenseGuardCardNumber  String?  // "License/Guard Card #" column
+  licenseExpiryPrimary    DateTime? // first "License Expiry" column
+  firearmInfo             String?
+  firearmSerialNumber     String?
+  farmCardNumber          String?  // "FARM CARD #" column
+  licenseExpirySecondary  DateTime? // second "License Expiry" column
+  badgeNumber             String?
+  bwcIssued               String?  // serial/ID string or null
+  cedIssued               String?  // serial/ID string or null
+  notes                   String?
 
-  // Computed from hireDate — updated on save
-  seniorityKey           DateTime? // mirrors hireDate for sort convenience
+  // ── Operational / scheduling fields ──────────────────────────────────
+  contractedWeeklyHours   Float    @default(40)   // 32 or 40 — first-class field
+  ptoAccrualRate          Float    @default(3.08) // hrs accrued per 80 hrs worked
+  ptoBalance              Float    @default(0)
+  sickBalance             Float    @default(0)
+  overtimeThreshold       Float    @default(40)   // hrs/week before OT kicks in
+  outageStatus            String?  // null = available, "pto" | "sick" | "outage" | "other"
+  activeFlag              Boolean  @default(true)
+  seniorityRank           Int?     // derived & stored for fast sort; lower = more senior
+  overtimeRule            String?  // JSON or string for custom OT rule overrides
+  nbotRule                String?  // JSON or string for NBOT eligibility rule
+  qualificationFlags      String?  // JSON array of qualification tags
+  availabilityNotes       String?
+  recurringScheduleTemplate String? // reference label or JSON for default pattern
+  nbotEligible            Boolean  @default(true)
+
+  // ── Seniority sort key (mirrors hireDate) ─────────────────────────────
+  seniorityKey            DateTime? // mirrors hireDate — used for ORDER BY
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

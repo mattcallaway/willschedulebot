@@ -1,5 +1,5 @@
 import prisma from "../lib/prisma.js";
-import { logAudit } from "./auditService.js";
+import { auditLog } from "./auditService.js";
 
 /**
  * Charge leave (PTO or sick) when a leave request is approved.
@@ -79,7 +79,7 @@ export async function accruePto(employeeId, hoursWorked, payPeriodEnd, recordedB
  */
 export async function accrueSick(employeeId, hoursWorked, payPeriodEnd, recordedBy) {
     const employee = await prisma.employee.findUniqueOrThrow({ where: { id: employeeId } });
-    const accrued = (hoursWorked / 80) * employee.sickAccrualRate;
+    const accrued = (hoursWorked / 80) * (employee.sickAccrualRate ?? 1.54);
     const newBalance = employee.sickBalance + accrued;
     await prisma.employee.update({ where: { id: employeeId }, data: { sickBalance: newBalance } });
     await prisma.sickLedger.create({
