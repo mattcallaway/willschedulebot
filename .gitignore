@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Build outputs
+dist/
+build/
+.next/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Misc
+.DS_Store
+Thumbs.db
+*.pem
+
+# Prisma
+backend/prisma/migrations/dev.db
+backend/prisma/*.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

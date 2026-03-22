@@ -1,0 +1,38 @@
+{
+  "name": "willschedulebot-backend",
+  "version": "1.0.0",
+  "description": "WillScheduleBot backend API — employee scheduling and leave management",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "migrate": "prisma migrate deploy",
+    "migrate:dev": "prisma migrate dev",
+    "generate": "prisma generate",
+    "seed": "node seeds/seed.js",
+    "import": "node scripts/import-roster.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-async-errors": "^3.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.8",
+    "date-fns": "^3.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4",
+    "prisma": "^5.22.0",
+    "vitest": "^2.1.1"
+  }
+}

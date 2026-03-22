@@ -1,0 +1,291 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ──────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("admin") // "admin" | "viewer"
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
+}
+
+// ─── Employees ─────────────────────────────────────────────────────────────
+
+model Employee {
+  id          String   @id @default(cuid())
+  // Roster fields
+  name        String
+  nuid        String?  @unique
+  rank        String?
+  phone       String?
+  email       String?
+  kpEmail     String?
+  shift       String?  // e.g. "Day", "Night", "Swing"
+  status      String?  // e.g. "Active", "Inactive", "Leave"
+  hireDate    DateTime?
+  last4       String?  // Last 4 of SSN
+  bciNumber   String?
+  badgeNumber String?
+  bwcIssued   Boolean  @default(false)
+  cedIssued   Boolean  @default(false)
+  notes       String?
+
+  // Operational fields
+  contractedWeeklyHours  Float    @default(40)   // 32 or 40
+  employmentType         String   @default("full-time") // full-time | part-time | contract
+  defaultShiftLength     Float    @default(8)    // hours
+  ptoAccrualRate         Float    @default(3.08) // hrs per 80 hrs worked
+  sickAccrualRate        Float    @default(1.54) // hrs per 80 hrs worked
+  ptoBalance             Float    @default(0)
+  sickBalance            Float    @default(0)
+  overtimeThreshold      Float    @default(40)   // hrs/week before OT
+  nbotEligible           Boolean  @default(true)
+  active                 Boolean  @default(true)
+
+  // Computed from hireDate — updated on save
+  seniorityKey           DateTime? // mirrors hireDate for sort convenience
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  credentials            EmployeeCredential?
+  recurringTemplates     RecurringScheduleTemplate[]
+  shiftAssignments       ShiftAssignment[]
+  leaveRequests          LeaveRequest[]
+  ptoLedger              PtoLedger[]
+  sickLedger             SickLedger[]
+  overtimeEntries        OvertimeEntry[]
+  nbotEntries            NbotEntry[]
+  blackoutDates          BlackoutDate[]
+}
+
+// ─── Credentials ───────────────────────────────────────────────────────────
+
+model EmployeeCredential {
+  id             String    @id @default(cuid())
+  employeeId     String    @unique
+  employee       Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  licenseNumber  String?
+  licenseExpiry  DateTime?
+  guardCardNumber String?
+  farmCardNumber  String?
+  firearmInfo     String?
+  firearmSerial   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Blackout / Availability Dates ─────────────────────────────────────────
+
+model BlackoutDate {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  startDate  DateTime
+  endDate    DateTime
+  reason     String?
+  createdAt  DateTime @default(now())
+}
+
+// ─── Recurring Schedule Templates ──────────────────────────────────────────
+
+model RecurringScheduleTemplate {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  name         String   @default("Default")
+  // JSON array of { dayOfWeek: 0-6, startTime: "HH:MM", endTime: "HH:MM", isNbot: bool }
+  pattern      Json
+  effectiveFrom DateTime @default(now())
+  effectiveTo   DateTime?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ─── Shifts ────────────────────────────────────────────────────────────────
+
+model Shift {
+  id          String   @id @default(cuid())
+  date        DateTime // The calendar date (midnight UTC)
+  startTime   String   // "HH:MM" 24h
+  endTime     String   // "HH:MM" 24h
+  durationHrs Float
+  label       String?  // e.g. "Day Shift", "Night Shift"
+  location    String?
+  notes       String?
+  isOpen      Boolean  @default(true) // true = shift needs coverage
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignments ShiftAssignment[]
+}
+
+// ─── Shift Assignments ─────────────────────────────────────────────────────
+
+model ShiftAssignment {
+  id           String   @id @default(cuid())
+  shiftId      String
+  shift        Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+
+  type         String   @default("regular") // regular | cover | split | override
+  isNbot       Boolean  @default(false)
+  nbotHours    Float    @default(0)
+  regularHours Float    @default(0)
+  overtimeHours Float   @default(0)
+
+  // Coverage / override metadata
+  coveredForEmployeeId String?  // Who they're covering for
+  overrideReason       String?
+  approvedBy           String?
+  recommendedReason    String?  // Why engine recommended this person
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Leave Requests ────────────────────────────────────────────────────────
+
+model LeaveRequest {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type        String   // "pto" | "sick" | "outage" | "unpaid" | "fmla" | "other"
+  status      String   @default("approved") // "pending" | "approved" | "denied"
+  startDate   DateTime
+  endDate     DateTime
+  hours       Float    // Total hours charged
+  reason      String?
+  adminNotes  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── PTO Ledger ────────────────────────────────────────────────────────────
+
+model PtoLedger {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type        String   // "accrual" | "usage" | "adjustment" | "carryover" | "payout"
+  hours       Float    // Positive = credit, Negative = debit
+  balance     Float    // Running balance after this entry
+  reason      String?
+  referenceId String?  // leaveRequestId if applicable
+  payPeriodEnd DateTime?
+  recordedBy  String?  // userId of admin who made the entry
+
+  createdAt DateTime @default(now())
+}
+
+// ─── Sick Ledger ───────────────────────────────────────────────────────────
+
+model SickLedger {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type        String   // "accrual" | "usage" | "adjustment"
+  hours       Float
+  balance     Float
+  reason      String?
+  referenceId String?
+  payPeriodEnd DateTime?
+  recordedBy  String?
+
+  createdAt DateTime @default(now())
+}
+
+// ─── Overtime Entries ──────────────────────────────────────────────────────
+
+model OvertimeEntry {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  periodStart DateTime
+  periodEnd   DateTime
+  regularHours   Float @default(0)
+  overtimeHours  Float @default(0)
+  approvedBy     String?
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── NBOT Entries ──────────────────────────────────────────────────────────
+
+model NbotEntry {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  shiftAssignmentId String?
+  date              DateTime
+  hours             Float
+  periodStart       DateTime
+  periodEnd         DateTime
+  notes             String?
+
+  createdAt DateTime @default(now())
+}
+
+// ─── Schedule Versions (history snapshots) ─────────────────────────────────
+
+model ScheduleVersion {
+  id          String   @id @default(cuid())
+  weekStart   DateTime
+  snapshot    Json     // Full denormalized shift+assignment data for the week
+  createdBy   String?
+  changeNote  String?
+  createdAt   DateTime @default(now())
+}
+
+// ─── Audit Log ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String   // e.g. "UPDATE_SHIFT", "ADJUST_PTO", "APPROVE_LEAVE"
+  entityType String   // "Employee", "Shift", "LeaveRequest", etc.
+  entityId   String
+  before     Json?
+  after      Json?
+  reason     String?
+  ip         String?
+  createdAt  DateTime @default(now())
+}
+
+// ─── App Settings ──────────────────────────────────────────────────────────
+
+model AppSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  label     String?
+  group     String?  // "overtime" | "accrual" | "nbot" | "general"
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
